@@ -91,7 +91,25 @@ async function adminInit(page: Page, includeTestFranchise = true) {
     }
 
     if (request.method() === "DELETE") {
-      const franchiseId = new URL(request.url()).pathname.split("/").pop();
+      const path = new URL(request.url()).pathname;
+      const pathParts = path.split("/");
+      if (pathParts.length === 6 && pathParts[4] === "store") {
+        const franchiseId = pathParts[3];
+        const storeId = pathParts[5];
+        const franchise = franchises.find(
+          (candidate) => String(candidate.id) === franchiseId,
+        );
+        const storeIndex = franchise?.stores.findIndex(
+          (store) => String(store.id) === storeId,
+        );
+        if (franchise && storeIndex !== undefined && storeIndex >= 0) {
+          franchise.stores.splice(storeIndex, 1);
+        }
+        await route.fulfill({ json: null });
+        return;
+      }
+
+      const franchiseId = pathParts.pop();
       const index = franchises.findIndex(
         (franchise) => String(franchise.id) === franchiseId,
       );
@@ -186,4 +204,30 @@ test("delete franchise", async ({ page }) => {
   expect(new URL(deleteRequest.url()).pathname).toBe("/api/franchise/5");
   await expect(page).toHaveURL(/\/admin-dashboard$/);
   await expect(page.getByText("test", { exact: true })).toHaveCount(0);
+});
+
+test("delete store", async ({ page }) => {
+  await adminInit(page);
+  await loginAsAdmin(page);
+
+  const storeRow = page
+    .getByRole("row")
+    .filter({ has: page.getByText("Lehi", { exact: true }) });
+  await storeRow.getByRole("button", { name: "Close", exact: true }).click();
+
+  await expect(page.getByText(/store Lehi/)).toBeVisible();
+
+  const deleteRequestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === "DELETE" &&
+      new URL(request.url()).pathname === "/api/franchise/2/store/4",
+  );
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+
+  const deleteRequest = await deleteRequestPromise;
+  expect(new URL(deleteRequest.url()).pathname).toBe(
+    "/api/franchise/2/store/4",
+  );
+  await expect(page).toHaveURL(/\/admin-dashboard$/);
+  await expect(page.getByText("Lehi", { exact: true })).toHaveCount(0);
 });

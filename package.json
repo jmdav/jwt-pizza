@@ -24,7 +24,7 @@
     "tailwindcss": "^3.4.3",
     "typescript": "^5.5.4",
     "vite": "^5.2.8",
-    "vite-plugin-istanbul": "^9.0.1"
+    "vite-plugin-istanbul": "^8.0.0"
   },
   "dependencies": {
     "preline": "^2.1.0",

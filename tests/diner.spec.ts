@@ -70,7 +70,7 @@ async function loginAsDiner(page: Page) {
   await page.goto("/diner-dashboard");
 }
 
-test("load and display diner order history", async ({ page }) => {
+test("diner order history", async ({ page }) => {
   await dinerInit(page);
 
   const ordersRequestPromise = page.waitForRequest(
@@ -84,8 +84,12 @@ test("load and display diner order history", async ({ page }) => {
   expect(new URL(ordersRequest.url()).pathname).toBe("/api/order");
 
   await expect(page.getByText("Kai Chen", { exact: true })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "23", exact: true })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "0.008 ₿", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "23", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "0.008 ₿", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("cell", { name: "2024-01-15T12:00:00.000Z", exact: true }),
   ).toBeVisible();

@@ -63,6 +63,10 @@ export default function AdminDashboard(props: Props) {
     navigate('/admin-dashboard/close-store', { state: { franchise: franchise, store: store } });
   }
 
+  function deleteUser(user: User) {
+    navigate('/admin-dashboard/delete-user', { state: { user } });
+  }
+
   async function filterFranchises() {
     setFranchiseList(await pizzaService.getFranchises(franchisePage, 10, `*${filterFranchiseRef.current?.value}*`));
   }
@@ -168,7 +172,7 @@ export default function AdminDashboard(props: Props) {
                     <table aria-label="Users" aria-busy={usersLoading} className="min-w-full divide-y divide-gray-200">
                       <thead className="uppercase text-neutral-100 bg-slate-400 border-b-2 border-gray-500">
                         <tr>
-                          {['ID', 'Name', 'Email'].map((header) => (
+                          {['ID', 'Name', 'Email', 'Action'].map((header) => (
                             <th key={header} scope="col" className="px-6 py-3 text-center text-xs font-medium">{header}</th>
                           ))}
                         </tr>
@@ -179,14 +183,20 @@ export default function AdminDashboard(props: Props) {
                             <td className="text-start px-2 py-2 whitespace-nowrap text-sm text-gray-800">{user.id}</td>
                             <td className="text-start px-2 py-2 whitespace-nowrap text-l font-mono text-orange-600">{user.name}</td>
                             <td className="text-start px-2 py-2 whitespace-nowrap text-sm text-gray-800">{user.email}</td>
+                            <td className="px-6 py-1 whitespace-nowrap text-end text-sm font-medium">
+                              <button type="button" className="px-2 py-1 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-1 border-orange-400 text-orange-400 hover:border-orange-800 hover:text-orange-800" onClick={() => deleteUser(user)}>
+                                <TrashIcon />
+                                Delete
+                              </button>
+                            </td>
                           </tr>
                         ))}
-                        {usersLoading && <tr><td colSpan={3} className="px-2 py-2 text-sm text-gray-800">Loading users…</td></tr>}
-                        {!usersLoading && !usersError && userList.users.length === 0 && <tr><td colSpan={3} className="px-2 py-2 text-sm text-gray-800">No users found.</td></tr>}
+                        {usersLoading && <tr><td colSpan={4} className="px-2 py-2 text-sm text-gray-800">Loading users…</td></tr>}
+                        {!usersLoading && !usersError && userList.users.length === 0 && <tr><td colSpan={4} className="px-2 py-2 text-sm text-gray-800">No users found.</td></tr>}
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td colSpan={2} className="px-1 py-1">
+                          <td colSpan={3} className="px-1 py-1">
                             <input type="text" ref={filterUserRef} name="filterUser" aria-label="Filter users by name" placeholder="Filter users" className="px-2 py-1 text-sm border border-gray-300 rounded-lg" />
                             <button type="submit" aria-label="Apply user filter" className="ml-2 px-2 py-1 text-sm font-semibold rounded-lg border border-orange-400 text-orange-400 hover:border-orange-800 hover:text-orange-800">Submit</button>
                           </td>

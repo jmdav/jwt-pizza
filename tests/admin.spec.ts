@@ -72,6 +72,29 @@ async function adminInit(page: Page, includeTestFranchise = true) {
     await route.fulfill({ json: loggedInUser });
   });
 
+  const users = Array.from({ length: 12 }, (_, index) => ({
+    id: index + 10,
+    name: index === 0 ? "Casey & Co" : `Diner ${index + 1}`,
+    email: `diner${index + 1}@test.com`,
+  }));
+  await page.route(/\/api\/user(?:\?.*)?$/, async (route) => {
+    const request = route.request();
+    expect(request.method()).toBe("GET");
+    expect(request.headers()["authorization"]).toBe("Bearer abcdef");
+    const query = new URL(request.url()).searchParams;
+    const pageNumber = Number(query.get("page"));
+    const limit = Number(query.get("limit"));
+    const name = (query.get("name") || "*").replace(/\*/g, "").toLowerCase();
+    const filteredUsers = users.filter((user) => user.name.toLowerCase().includes(name));
+    const offset = (pageNumber - 1) * limit;
+    await route.fulfill({
+      json: {
+        users: filteredUsers.slice(offset, offset + limit),
+        more: offset + limit < filteredUsers.length,
+      },
+    });
+  });
+
   await page.route(/\/api\/franchise(?:\/[^?]+)?(?:\?.*)?$/, async (route) => {
     const request = route.request();
 
@@ -128,8 +151,61 @@ async function loginAsAdmin(page: Page) {
   await page.getByPlaceholder("Email address").fill(ADMIN_EMAIL);
   await page.getByPlaceholder("Password").fill(ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Login" }).click();
+  await expect(page).toHaveURL("/");
   await page.goto("/admin-dashboard");
 }
+
+test("admin user list paginates independently of franchises", async ({ page }) => {
+  await adminInit(page);
+  await loginAsAdmin(page);
+
+  const users = page.getByRole("table", { name: "Users", exact: true });
+  await expect(users.getByRole("cell", { name: "Casey & Co", exact: true })).toBeVisible();
+  await expect(users.locator("tbody tr")).toHaveCount(10);
+  await expect(users.getByRole("button", { name: "Previous user page" })).toBeDisabled();
+
+  const nextRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/user" && url.searchParams.get("page") === "2";
+  });
+  await users.getByRole("button", { name: "Next user page" }).click();
+  const nextQuery = new URL((await nextRequest).url()).searchParams;
+  expect(nextQuery.get("limit")).toBe("10");
+  expect(nextQuery.get("name")).toBe("*");
+  await expect(users.locator("tbody tr")).toHaveCount(2);
+  await expect(users.getByRole("cell", { name: "Diner 11", exact: true })).toBeVisible();
+  await expect(users.getByRole("cell", { name: "Diner 12", exact: true })).toBeVisible();
+  await expect(users.getByRole("button", { name: "Next user page" })).toBeDisabled();
+  await expect(page.getByRole("cell", { name: "LotaPizza", exact: true })).toBeVisible();
+
+  await users.getByRole("button", { name: "Previous user page" }).click();
+  await expect(users.getByRole("cell", { name: "Casey & Co", exact: true })).toBeVisible();
+  await expect(users.locator("tbody tr")).toHaveCount(10);
+});
+
+test("admin user filter encodes names and resets pagination", async ({ page }) => {
+  await adminInit(page);
+  await loginAsAdmin(page);
+
+  const users = page.getByRole("table", { name: "Users", exact: true });
+  await users.getByRole("button", { name: "Next user page" }).click();
+  await expect(users.getByRole("cell", { name: "Diner 11", exact: true })).toBeVisible();
+
+  const filterRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/user" && url.searchParams.get("name") === "*Casey & Co*";
+  });
+  await users.getByRole("textbox", { name: "Filter users by name" }).fill("Casey & Co");
+  await users.getByRole("button", { name: "Apply user filter" }).click();
+  const query = new URL((await filterRequest).url()).searchParams;
+  expect(query.get("page")).toBe("1");
+  expect(query.get("limit")).toBe("10");
+  await expect(users.locator("tbody tr")).toHaveCount(1);
+  await expect(users.getByRole("cell", { name: "Casey & Co", exact: true })).toBeVisible();
+  await expect(users.getByRole("cell", { name: "diner1@test.com", exact: true })).toBeVisible();
+  await expect(users.getByRole("button", { name: "Previous user page" })).toBeDisabled();
+  await expect(users.getByRole("button", { name: "Next user page" })).toBeDisabled();
+});
 
 test("add franchise", async ({ page }) => {
   await adminInit(page, false);

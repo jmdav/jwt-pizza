@@ -5,6 +5,7 @@ import {
   Store,
   OrderHistory,
   User,
+  UserList,
   Menu,
   Order,
   Endpoints,
@@ -95,6 +96,19 @@ class HttpPizzaService implements PizzaService {
 
   async getMenu(): Promise<Menu> {
     return this.callEndpoint("/api/order/menu");
+  }
+
+  async getUsers(
+    page: number = 0,
+    limit: number = 10,
+    nameFilter: string = "*",
+  ): Promise<UserList> {
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      name: nameFilter,
+    });
+    return this.callEndpoint(`/api/user?${query}`);
   }
 
   async getOrders(user: User): Promise<OrderHistory> {

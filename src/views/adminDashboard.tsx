@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import NotFound from './notFound';
 import Button from '../components/button';
 import { pizzaService } from '../service/service';
-import { Franchise, FranchiseList, Role, Store, User } from '../service/pizzaService';
+import { Franchise, FranchiseList, Role, Store, User, UserList } from '../service/pizzaService';
 import { TrashIcon } from '../icons';
 
 interface Props {
@@ -16,6 +16,34 @@ export default function AdminDashboard(props: Props) {
   const [franchiseList, setFranchiseList] = React.useState<FranchiseList>({ franchises: [], more: false });
   const [franchisePage, setFranchisePage] = React.useState(0);
   const filterFranchiseRef = React.useRef<HTMLInputElement>(null);
+  const [userList, setUserList] = React.useState<UserList>({ users: [], more: false });
+  const [userQuery, setUserQuery] = React.useState({ page: 1, nameFilter: '*' });
+  const [usersLoading, setUsersLoading] = React.useState(false);
+  const [usersError, setUsersError] = React.useState('');
+  const filterUserRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (!Role.isRole(props.user, Role.Admin)) return;
+
+    let active = true;
+    setUsersLoading(true);
+    setUsersError('');
+    (async () => {
+      try {
+        const result = await pizzaService.getUsers(userQuery.page, 10, userQuery.nameFilter);
+        if (active) setUserList(result);
+      } catch {
+        if (active) {
+          setUserList({ users: [], more: false });
+          setUsersError('Unable to load users. Please try again.');
+        }
+      } finally {
+        if (active) setUsersLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [props.user, userQuery]);
 
   React.useEffect(() => {
     (async () => {
@@ -37,6 +65,12 @@ export default function AdminDashboard(props: Props) {
 
   async function filterFranchises() {
     setFranchiseList(await pizzaService.getFranchises(franchisePage, 10, `*${filterFranchiseRef.current?.value}*`));
+  }
+
+  function filterUsers(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = filterUserRef.current?.value.trim();
+    setUserQuery({ page: 1, nameFilter: name ? `*${name}*` : '*' });
   }
 
   let response = <NotFound />;
@@ -122,6 +156,53 @@ export default function AdminDashboard(props: Props) {
         </div>
         <div>
           <Button className="w-36 text-xs sm:text-sm sm:w-64" title="Add Franchise" onPress={createFranchise} />
+        </div>
+        <div className="text-start py-8 px-4 sm:px-6 lg:px-8">
+          <h3 className="text-neutral-100 text-xl">Users</h3>
+          {usersError && <p role="alert" className="my-2 text-orange-400">{usersError}</p>}
+          <form onSubmit={filterUsers} className="bg-neutral-100 overflow-clip my-4">
+            <div className="flex flex-col">
+              <div className="-m-1.5 overflow-x-auto">
+                <div className="p-1.5 min-w-full inline-block align-middle">
+                  <div className="overflow-hidden">
+                    <table aria-label="Users" aria-busy={usersLoading} className="min-w-full divide-y divide-gray-200">
+                      <thead className="uppercase text-neutral-100 bg-slate-400 border-b-2 border-gray-500">
+                        <tr>
+                          {['ID', 'Name', 'Email'].map((header) => (
+                            <th key={header} scope="col" className="px-6 py-3 text-center text-xs font-medium">{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {userList.users.map((user) => (
+                          <tr key={user.id} className="bg-neutral-100">
+                            <td className="text-start px-2 py-2 whitespace-nowrap text-sm text-gray-800">{user.id}</td>
+                            <td className="text-start px-2 py-2 whitespace-nowrap text-l font-mono text-orange-600">{user.name}</td>
+                            <td className="text-start px-2 py-2 whitespace-nowrap text-sm text-gray-800">{user.email}</td>
+                          </tr>
+                        ))}
+                        {usersLoading && <tr><td colSpan={3} className="px-2 py-2 text-sm text-gray-800">Loading users…</td></tr>}
+                        {!usersLoading && !usersError && userList.users.length === 0 && <tr><td colSpan={3} className="px-2 py-2 text-sm text-gray-800">No users found.</td></tr>}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={2} className="px-1 py-1">
+                            <input type="text" ref={filterUserRef} name="filterUser" aria-label="Filter users by name" placeholder="Filter users" className="px-2 py-1 text-sm border border-gray-300 rounded-lg" />
+                            <button type="submit" aria-label="Apply user filter" className="ml-2 px-2 py-1 text-sm font-semibold rounded-lg border border-orange-400 text-orange-400 hover:border-orange-800 hover:text-orange-800">Submit</button>
+                          </td>
+                          <td className="text-end text-sm font-medium whitespace-nowrap">
+                            <span className="px-2 text-gray-800">Page {userQuery.page}</span>
+                            <button type="button" aria-label="Previous user page" className="w-12 p-1 text-sm font-semibold rounded-lg border border-transparent bg-white text-grey border-grey m-1 hover:bg-orange-200 disabled:bg-neutral-300" onClick={() => setUserQuery((query) => ({ ...query, page: query.page - 1 }))} disabled={usersLoading || userQuery.page <= 1}>«</button>
+                            <button type="button" aria-label="Next user page" className="w-12 p-1 text-sm font-semibold rounded-lg border border-transparent bg-white text-grey border-grey m-1 hover:bg-orange-200 disabled:bg-neutral-300" onClick={() => setUserQuery((query) => ({ ...query, page: query.page + 1 }))} disabled={usersLoading || !userList.more}>»</button>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
         </div>
       </View>
     );

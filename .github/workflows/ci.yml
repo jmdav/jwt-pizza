@@ -51,6 +51,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      contents: read  # Required for actions/checkout
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
